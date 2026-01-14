@@ -1,9 +1,11 @@
 可视化体感控制系统 - 使用指南
 
 🚀 快速开始
-运行环境：python 3.10（Windows-64bit）
-安装依赖：pip install -r requirements.txt
-运行程序main.py
+运行环境:python 3.10（Windows-64bit）
+
+安装依赖:pip install -r requirements.txt
+
+运行程序:main.py
 
 操作流程
 
