@@ -129,7 +129,7 @@ class GestureItemWidget(QFrame):
         if self.is_custom:
             delete_btn = QPushButton("删除")
             delete_btn.setObjectName("dangerById")
-            delete_btn.setFixedWidth(60)
+            # delete_btn.setFixedWidth(60) # Removing to fix padding issue
             delete_btn.clicked.connect(
                 lambda: self.delete_clicked.emit(self.mapping.id)
             )
@@ -192,7 +192,12 @@ class GestureConfigPanel(QWidget):
         custom_ids = self.manager.custom_gestures_data.keys()
         
         for mapping in mappings:
+            # 如果是预定义手势，且我们想要隐藏它们(虽然用户无法修改enable_predefined_gestures，但UI应该配合)
+            # 用户要求 "也许可以除去预设手势"，与其彻底删除数据，不如在列表中隐藏
             is_custom = mapping.id in custom_ids
+            if not is_custom:
+                continue
+                
             widget = GestureItemWidget(mapping, is_custom)
             widget.edit_clicked.connect(self.open_edit_dialog)
             widget.toggle_clicked.connect(self.toggle_mapping)

@@ -96,20 +96,15 @@ class CreateGestureDialog(QDialog):
         self.detector.release()
         super().closeEvent(event)
         
-    @pyqtSlot(np.ndarray)
-    def process_frame(self, frame):
-        # 翻转
-        frame = cv2.flip(frame, 1)
+    @pyqtSlot(QImage, list)
+    def process_frame(self, qt_image, results):
+        self.last_results = results # Store for capture
+        self.last_qt_image = qt_image # Store for capture
         
-        # 检测
-        annotated_frame, results = self.detector.process_frame(frame)
-        
-        # 转换显示
-        rgb_image = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_image.shape
-        qt_image = QImage(rgb_image.data, w, h, ch * w, QImage.Format.Format_RGB888)
+        # 直接显示图像 (qt_image is already RGB QImage from worker)
         self.image_label.setPixmap(QPixmap.fromImage(qt_image).scaled(
-            self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio
+            self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
         ))
     
     def start_capture(self):
@@ -136,49 +131,43 @@ class CreateGestureDialog(QDialog):
 
     def execute_capture(self):
         self.is_counting_down = False
-        # 获取当前帧
-        ret, frame = self.worker.camera.read()
-        if ret:
-            frame = cv2.flip(frame, 1)
-            annotated_frame, results = self.detector.process_frame(frame)
+        
+        # 直接使用最近的一帧数据
+        # Accessing self.worker.camera.read() here is unsafe and redundant
+        
+        if hasattr(self, 'last_results') and self.last_results and hasattr(self, 'last_qt_image'):
+             # 获取第一只手的关键点
+            self.captured_landmarks = self.last_results[0].hand_landmarks.landmarks
             
-            if results:
-                # 获取第一只手的关键点
-                self.captured_landmarks = results[0].hand_landmarks.landmarks
-                
-                # 更新界面显示定格画面
-                rgb_image = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = rgb_image.shape
-                qt_image = QImage(rgb_image.data, w, h, ch * w, QImage.Format.Format_RGB888)
-                self.image_label.setPixmap(QPixmap.fromImage(qt_image).scaled(
-                    self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio
-                ))
-                
-                # 暂停摄像头更新
-                self.worker.stop()
-                
-                self.info_label.setText("捕获成功！请确认骨架是否准确")
-                self.info_label.setStyleSheet(f"color: {COLORS['success']}; font-size: 16px; font-weight: 500;")
-                
-                self.capture_btn.setText("重新捕获")
-                self.capture_btn.setObjectName("secondaryById")
-                self.capture_btn.setEnabled(True)
-                self.cancel_btn.setEnabled(True)
-                self.save_btn.setEnabled(True)
-                
-                # 重新绑定捕获按钮事件为重置
-                self.capture_btn.clicked.disconnect()
-                self.capture_btn.clicked.connect(self.reset_capture)
-            else:
-                self.info_label.setText("未检测到手势，请重试")
-                self.info_label.setStyleSheet(f"color: {COLORS['error']}; font-size: 16px; font-weight: 500;")
-                self.capture_btn.setEnabled(True)
-                self.cancel_btn.setEnabled(True)
-                self.is_counting_down = False
-        else:
-            self.is_counting_down = False
+            # 更新界面显示定格画面
+            self.image_label.setPixmap(QPixmap.fromImage(self.last_qt_image).scaled(
+                self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            ))
+            
+            # 暂停摄像头更新 (Worker stop will stop emitting signals)
+            self.worker.stop()
+            
+            self.info_label.setText("捕获成功！请确认骨架是否准确")
+            self.info_label.setStyleSheet(f"color: {COLORS['success']}; font-size: 16px; font-weight: 500;")
+            
+            self.capture_btn.setText("重新捕获")
+            self.capture_btn.setObjectName("secondaryById")
             self.capture_btn.setEnabled(True)
             self.cancel_btn.setEnabled(True)
+            self.save_btn.setEnabled(True)
+            
+            # 重新绑定捕获按钮事件为重置
+            try:
+                self.capture_btn.clicked.disconnect()
+            except: pass
+            self.capture_btn.clicked.connect(self.reset_capture)
+        else:
+            self.info_label.setText("未检测到手势，请重试")
+            self.info_label.setStyleSheet(f"color: {COLORS['error']}; font-size: 16px; font-weight: 500;")
+            self.capture_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(True)
+            self.is_counting_down = False
 
     def reset_capture(self):
         self.captured_landmarks = None

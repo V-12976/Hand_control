@@ -56,7 +56,8 @@ class GestureDetector:
         self,
         detection_confidence: float = 0.7,
         tracking_confidence: float = 0.5,
-        max_hands: int = 2
+        max_hands: int = 2,
+        enable_predefined_gestures: bool = False
     ):
         """
         初始化手势检测器
@@ -74,12 +75,14 @@ class GestureDetector:
         
         self.custom_templates: Dict[str, List[Tuple[float, float, float]]] = {}
         self.gesture_names: Dict[str, str] = {}
+        self.enable_predefined_gestures = enable_predefined_gestures
         
     def set_custom_templates(self, templates: Dict[str, List[Tuple[float, float, float]]]):
         """设置自定义手势模板"""
-        self.custom_templates = {}
+        new_templates = {}
         for gid, landmarks in templates.items():
-            self.custom_templates[gid] = self._normalize_landmarks(landmarks)
+            new_templates[gid] = self._normalize_landmarks(landmarks)
+        self.custom_templates = new_templates
             
     def set_gesture_names(self, names: Dict[str, str]):
         """设置手势显示名称映射 {id: name}"""
@@ -216,29 +219,30 @@ class GestureDetector:
         if best_match_id and min_dist < 0.15:
             return GestureType.CUSTOM, 1.0 - min_dist, best_match_id
             
-        # 2. 匹配预定义手势
-        fingers_up = self._get_fingers_up(landmarks)
-        thumb_up = self._is_thumb_up(landmarks)
-        
-        # 握拳
-        if not any(fingers_up) and not thumb_up:
-            return GestureType.FIST, 0.9, "fist"
-        
-        # 张开手掌
-        if all(fingers_up) and thumb_up:
-            return GestureType.OPEN_PALM, 0.9, "open_palm"
-        
-        # 竖起大拇指
-        if thumb_up and not any(fingers_up):
-            return GestureType.THUMBS_UP, 0.9, "thumbs_up"
-        
-        # 胜利手势
-        if fingers_up[0] and fingers_up[1] and not fingers_up[2] and not fingers_up[3]:
-            return GestureType.VICTORY, 0.9, "victory"
-        
-        # 竖起食指
-        if fingers_up[0] and not fingers_up[1] and not fingers_up[2] and not fingers_up[3]:
-            return GestureType.POINT_UP, 0.9, "point_up"
+        # 2. 匹配预定义手势 (如果启用)
+        if self.enable_predefined_gestures:
+            fingers_up = self._get_fingers_up(landmarks)
+            thumb_up = self._is_thumb_up(landmarks)
+            
+            # 握拳
+            if not any(fingers_up) and not thumb_up:
+                return GestureType.FIST, 0.9, "fist"
+            
+            # 张开手掌
+            if all(fingers_up) and thumb_up:
+                return GestureType.OPEN_PALM, 0.9, "open_palm"
+            
+            # 竖起大拇指
+            if thumb_up and not any(fingers_up):
+                return GestureType.THUMBS_UP, 0.9, "thumbs_up"
+            
+            # 胜利手势
+            if fingers_up[0] and fingers_up[1] and not fingers_up[2] and not fingers_up[3]:
+                return GestureType.VICTORY, 0.9, "victory"
+            
+            # 竖起食指
+            if fingers_up[0] and not fingers_up[1] and not fingers_up[2] and not fingers_up[3]:
+                return GestureType.POINT_UP, 0.9, "point_up"
         
         return GestureType.NONE, 0.0, ""
         
@@ -321,7 +325,8 @@ class CameraCapture:
         
     def start(self) -> bool:
         """启动摄像头"""
-        self.cap = cv2.VideoCapture(self.source)
+        # 使用DirectShow (CAP_DSHOW) 在Windows上通常启动更快
+        self.cap = cv2.VideoCapture(self.source, cv2.CAP_DSHOW)
         if self.cap.isOpened():
             self._is_running = True
             # 设置分辨率

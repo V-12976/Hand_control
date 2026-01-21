@@ -158,6 +158,15 @@ class MainWindow(QMainWindow):
     def switch_page(self, index):
         self.content_stack.setCurrentIndex(index)
         
+        # 切换页面时管理摄像头资源，避免冲突
+        if index == 1: # Config Page
+            # 停止摄像头以释放资源给"新建手势"对话框使用
+            self.camera_view.stop_camera()
+        elif index == 0: # Preview Page
+            # 如果处于"控制中"状态，且切回预览页，则重新启动摄像头
+            if self.is_controlling:
+                self.camera_view.start_camera()
+                
     def toggle_control(self, checked):
         if checked:
             self.btn_toggle_control.setText("停止控制")
